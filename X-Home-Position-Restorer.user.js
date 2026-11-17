@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         X Home Position Restorer (Mobile)
 // @namespace    https://x.com/
-// @version      1.2.1
-// @description  Snapshot last Home position on leave; floating Restore + Auto button (bottom-left)
+// @version      1.3.0
+// @description  Snapshot last Home position on leave; floating Restore + Auto button (bottom-left). Auto turns off after successful restore.
 // @author       Custom
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -30,7 +30,12 @@
     if (data) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }
   function getAuto() { return sessionStorage.getItem(AUTO_KEY) === '1'; }
-  function setAuto(on) { sessionStorage.setItem(AUTO_KEY, on ? '1' : '0'); }
+  function setAuto(on) {
+    sessionStorage.setItem(AUTO_KEY, on ? '1' : '0');
+    // Update checkbox if it exists
+    const cb = document.querySelector('#' + BTN_ID + ' input[type="checkbox"]');
+    if (cb) cb.checked = on;
+  }
 
   function isHome() {
     return location.pathname === '/home' || location.pathname === '/';
@@ -103,6 +108,7 @@
 
     const targetId = saved.tweetId;
     const targetOffset = saved.offset || 80;
+    const wasAuto = getAuto();
 
     const cancel = () => { restoreAbort = true; };
     ['wheel', 'touchmove', 'keydown'].forEach(ev =>
@@ -110,6 +116,7 @@
     );
 
     let attempts = 0;
+    let found = false;
     while (!restoreAbort && attempts < 45) {
       const art = findTweetById(targetId);
       if (art) {
@@ -117,11 +124,19 @@
         window.scrollBy(0, delta);
         art.style.outline = '3px solid #1d9bf0';
         setTimeout(() => art.style.outline = '', 3000);
+        found = true;
+        console.log('[Home Pos] Restored to tweet', targetId);
         break;
       }
       window.scrollBy(0, window.scrollY < 80 ? 500 : -700);
       attempts++;
       await new Promise(r => setTimeout(r, 180));
+    }
+
+    // Turn Auto off after a successful restore
+    if (found && wasAuto) {
+      setAuto(false);
+      console.log('[Home Pos] Auto turned off after successful restore');
     }
 
     isRestoring = false;
@@ -200,5 +215,5 @@
   wasOnHome = isHome();
   if (wasOnHome) updateLivePosition();
 
-  console.log('[Home Pos Mobile] Loaded. Floating button bottom-left.');
+  console.log('[Home Pos Mobile] Loaded. Floating button bottom-left. Auto turns off after successful restore.');
 })();
